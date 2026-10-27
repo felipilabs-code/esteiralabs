@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191919">
+  <title>Entrar · Ativa.ai Labs</title>
+  <style>
+    :root{font-family:Montserrat,"Avenir Next",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#252321;background:#f8f7f5;font-synthesis:none}
+    *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
+    .login-card{width:min(100%,400px);padding:32px;background:#fff;border:1px solid #e8e4df;border-radius:12px;box-shadow:0 12px 36px #24170f0c}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}.brand-mark{width:42px;height:42px;display:grid;place-items:center;border-radius:9px;background:#191919;color:#ec6c27;font-weight:800;font-size:18px}
+    .brand-name{font-size:20px;line-height:1.15;font-weight:800;letter-spacing:-.05em}.brand-name span{color:#ec6c27}.brand-caption{margin-top:4px;color:#817a73;font-size:9px;font-weight:650;letter-spacing:.12em}
+    h1{margin:0 0 5px;font-size:20px;letter-spacing:-.03em} .intro{margin:0 0 22px;color:#716d68;font-size:13px}
+    form{display:grid;gap:15px}.field{display:grid;gap:6px}.field label{font-size:11px;font-weight:700;color:#5e5751}.field input{height:42px;width:100%;padding:0 12px;border:1px solid #e3e0dc;border-radius:6px;background:#fff;color:#252321;font:inherit;font-size:13px;outline:none}.field input:focus{border-color:#e6a17f;box-shadow:0 0 0 3px #e96b2c18}
+    button{height:42px;border:0;border-radius:6px;background:#ec6c27;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}button:hover{background:#d75a1d}button:disabled{opacity:.65;cursor:wait}
+    .error{margin:0;padding:10px 12px;border-radius:6px;background:#fff1ed;color:#9d321d;font-size:12px}.error[hidden]{display:none}
+    .footnote{margin:20px 0 0;text-align:center;color:#8a837d;font-size:10px}
+    @media(max-width:480px){.login-card{padding:25px 21px}}
+  </style>
+</head>
+<body>
+  <main class="login-card">
+    <div class="brand"><div class="brand-mark">A.</div><div><div class="brand-name">Ativa<span>.ai</span></div><div class="brand-caption">LABS · ESTEIRA DE DESENVOLVIMENTO</div></div></div>
+    <h1>Acesse sua conta</h1>
+    <p class="intro">Entre com seu usuário e senha para abrir a esteira.</p>
+    <form id="loginForm">
+      <div class="field"><label for="username">Usuário</label><input id="username" name="username" autocomplete="username" maxlength="40" required autofocus></div>
+      <div class="field"><label for="password">Senha</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required></div>
+      <p class="error" id="loginError" role="alert" hidden></p>
+      <button id="submitButton" type="submit">Entrar</button>
+    </form>
+    <p class="footnote">Acesso restrito à equipe Ativa.ai.</p>
+  </main>
+  <script>
+    const form=document.getElementById('loginForm'),errorBox=document.getElementById('loginError'),submitButton=document.getElementById('submitButton');
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();errorBox.hidden=true;submitButton.disabled=true;submitButton.textContent='Entrando…';
+      try{
+        const csrfResponse=await fetch('/auth/csrf',{credentials:'same-origin'});
+        const csrfData=await csrfResponse.json();
+        if(!csrfResponse.ok)throw new Error(csrfData.error||'Não foi possível iniciar a sessão.');
+        const response=await fetch('/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfData.csrfToken},body:JSON.stringify({username:document.getElementById('username').value,password:document.getElementById('password').value})});
+        const result=await response.json();
+        if(!response.ok)throw new Error(result.error||'Não foi possível entrar.');
+        window.location.replace('/');
+      }catch(error){errorBox.textContent=error.message;errorBox.hidden=false;submitButton.disabled=false;submitButton.textContent='Entrar';}
+    });
+  </script>
+</body>
+</html>
