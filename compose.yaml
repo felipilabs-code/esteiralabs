@@ -1,22 +1,20 @@
 services:
-  esteiraLabs:
+  esteira-web:
     build: .
     image: esteira-labs:latest
     restart: unless-stopped
     environment:
-      PORT: "8000"
-      DB_HOST: ${DB_HOST}
+      DB_HOST: ${DB_HOST:?Defina DB_HOST nas variaveis da Stack}
       DB_PORT: ${DB_PORT:-3306}
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      APP_SECRET_KEY: ${APP_SECRET_KEY}
+      DB_NAME: ${DB_NAME:?Defina DB_NAME nas variaveis da Stack}
+      DB_USER: ${DB_USER:?Defina DB_USER nas variaveis da Stack}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD nas variaveis da Stack}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?Defina APP_SECRET_KEY nas variaveis da Stack}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
+      PORT: "8000"
     expose:
       - "8000"
-    networks:
-      - ativaai
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
@@ -24,6 +22,14 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    networks:
+      - ativaai
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
 
 networks:
   ativaai:

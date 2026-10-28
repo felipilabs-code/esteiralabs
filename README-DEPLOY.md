@@ -12,19 +12,25 @@ Hospedagem cPanel compartilhada com **Setup Python App/Passenger**, mas sem Dock
 
 ## 1. Criar as tabelas
 
-Crie um banco exclusivo para o MVP no painel autorizado pela TI. A aplicação espera que as tabelas existentes de `projects`, `tasks`, `task_assignees` e `task_topics` estejam nesse banco. Execute scripts de schema somente com a conta autorizada a administrá-lo; o usuário da aplicação não precisa de permissão para criar ou alterar tabelas.
+Crie um banco exclusivo para o MVP no painel autorizado pela TI. Se ainda não criou as tabelas, selecione esse banco e execute `schema.sql` e `auth_login_attempts.sql` com uma conta administrativa. Não rode esses scripts em outro banco. O usuário da aplicação não precisa de permissão para criar ou alterar tabelas.
 
-O usuário da aplicação deve ter apenas `SELECT`, `INSERT`, `UPDATE` e `DELETE` no banco do MVP. A criação das tabelas é feita separadamente com a conta autorizada a administrá-lo.
+Crie também pelo menos um registro de usuário em `app_users`, preenchendo `password_hash` com um hash Werkzeug PBKDF2-SHA256. Gere o hash localmente sem colocar a senha em um comando salvo no histórico:
+
+```sh
+python3 -c 'from getpass import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass("Senha: "), method="pbkdf2:sha256:600000"))'
+```
+
+Use o hash resultante em um `INSERT` administrativo para criar cada pessoa (com `UUID()` para o ID, nome de usuário, nome de exibição e perfil `Estagiário`, `Pessoa de Dados` ou `Líder`). Não use senha em texto simples nem uma senha inicial previsível. O usuário da aplicação deve ter apenas `SELECT`, `INSERT`, `UPDATE` e `DELETE` no banco do MVP.
 
 ## 2. Configurar as variáveis
 
-Na pasta do projeto, crie o arquivo local `.env` a partir do exemplo e informe os dados fornecidos pela TI:
+Para executar localmente, crie o arquivo `.env` a partir do exemplo e informe os dados fornecidos pela TI:
 
 ```sh
 cp -n .env.example .env
 ```
 
-Configure `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD`. `APP_PORT` define a porta local do proxy reverso e usa `8000` por padrão. O arquivo `.env` é excluído do Git e do contexto da imagem Docker; não coloque credenciais no código nem as envie ao repositório.
+Configure `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD`. O arquivo `.env` é excluído do Git e do contexto da imagem Docker; não coloque credenciais no código nem as envie ao repositório.
 
 Gere um segredo exclusivo para assinar as sessões e configure `APP_SECRET_KEY`:
 
@@ -34,17 +40,23 @@ python3 -c 'import secrets; print(secrets.token_hex(32))'
 
 Mantenha `SESSION_COOKIE_SECURE=true` em produção com HTTPS. `TRUST_PROXY_HEADERS=true` usa o cabeçalho `X-Real-IP` para aplicar o limite de tentativas ao IP real quando há um proxy confiável na frente do app; configure esse proxy para substituir o cabeçalho recebido do cliente. Para desenvolvimento local por HTTP, use `SESSION_COOKIE_SECURE=false` apenas no `.env` local.
 
-## 3. Iniciar com Docker Compose
+## 3. Deploy pelo Portainer
+
+Antes do deploy, confirme com a TI que a rede Docker externa `ativaai` existe e que o container do Nginx Proxy Manager está conectado a ela. No Portainer, crie uma Stack usando o repositório Git, branch `main` e caminho `compose.yaml`. Cadastre nela `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` e `APP_SECRET_KEY` (gere este último com o comando acima). Não salve segredos no Git. O compose conecta o serviço `esteira-web` à rede `ativaai` e exige as variáveis antes de iniciar.
+
+Depois do deploy, confirme que o container está `healthy`. No Nginx Proxy Manager, crie um Proxy Host para o domínio aprovado: encaminhamento `http` para `esteira-web`, porta `8000`. Ative SSL com Let's Encrypt, Force SSL e HTTP/2. Em Advanced, inclua `proxy_set_header X-Real-IP $remote_addr;`. O nome `esteira-web` evita conflito com serviços chamados `web` na mesma rede.
+
+## 4. Iniciar localmente com Docker Compose
 
 Na VPS, com Docker e Compose instalados e o `.env` configurado:
 
 ```sh
 docker compose up --build -d
 docker compose ps
-docker compose logs -f web
+docker compose logs -f esteira-web
 ```
 
-O serviço fica disponível apenas em `127.0.0.1:8000` por padrão. Configure o proxy reverso aprovado pela TI para encaminhar o domínio à porta local e terminar HTTPS. Para usar outra porta local, ajuste `APP_PORT` no `.env` e recrie o serviço. Não exponha diretamente a porta da aplicação à internet.
+O serviço não publica uma porta na VPS. O Nginx Proxy Manager acessa a porta interna 8000 pela rede Docker `ativaai`. Para testar em uma máquina local sem o proxy, adicione temporariamente um arquivo Compose de desenvolvimento que publique `127.0.0.1:8000:8000`. Não exponha diretamente a porta da aplicação à internet.
 
 Para publicar uma atualização:
 
@@ -60,13 +72,13 @@ docker compose down
 
 Os dados ficam no MySQL externo e não são removidos ao recriar o container. O host MySQL precisa aceitar conexões originadas pela VPS/container; restrinja também essa permissão ao endereço e ao usuário da aplicação.
 
-## 4. Login e proteção das rotas
+## 5. Login e proteção das rotas
 
-A tabela `app_users` guarda os usuários e hashes de senha. Ela foi criada pela query inicial. Execute também `auth_login_attempts.sql` uma vez no banco para habilitar o limite de tentativas de login; o usuário MySQL da aplicação precisa de `SELECT`, `INSERT`, `UPDATE` e `DELETE` nessa tabela.
+A tabela `app_users` guarda os usuários e hashes de senha. Crie-a com `schema.sql`. Execute também `auth_login_attempts.sql` uma vez no banco para habilitar o limite de tentativas de login; o usuário MySQL da aplicação precisa de `SELECT`, `INSERT`, `UPDATE` e `DELETE` nessa tabela.
 
 O Flask exige login para servir o quadro e para qualquer rota de tarefas ou projetos. As sessões expiram após oito horas, os formulários de escrita usam token CSRF e cinco tentativas incorretas por usuário e endereço de origem bloqueiam novas tentativas por 15 minutos. Os três perfis cadastrados identificam a pessoa e o papel; no momento, todos têm as mesmas permissões de edição.
 
-## 5. Acesso da equipe
+## 6. Acesso da equipe
 
 Antes de compartilhar a URL, habilite HTTPS e proteja o acesso à equipe. Não publique o sistema sem HTTPS. A senha inicial foi definida para cada pessoa; troque credenciais previsíveis antes de usar dados reais.
 
@@ -85,6 +97,7 @@ Se o cPanel não oferecer Passenger nem Docker, não use o servidor de desenvolv
 - `Dockerfile` e `compose.yaml`: imagem e execução do serviço web.
 - `login.html`: tela de entrada.
 - `auth_login_attempts.sql`: tabela para limitar tentativas incorretas.
+- `schema.sql`: tabelas de usuários, projetos e tarefas.
 - `passenger_wsgi.py`: entrada para cPanel/Passenger.
 - `requirements.txt`: dependências Python, incluindo Gunicorn.
 - As tabelas `projects`, `tasks`, `task_assignees` e `task_topics`: estrutura MySQL já usada pela aplicação.

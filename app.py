@@ -88,6 +88,20 @@ def auth_csrf():
     return jsonify({"csrfToken": csrf_token()})
 
 
+@app.get("/healthz")
+def healthz():
+    try:
+        connection = db_connect()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            return jsonify({"status": "ok"})
+        finally:
+            connection.close()
+    except Exception:
+        return jsonify({"status": "unavailable"}), 503
+
+
 @app.get("/auth/session")
 def auth_session():
     if not session.get("user_id"):
