@@ -1,14 +1,22 @@
 services:
-  web:
+  esteiraLabs:
     build: .
     image: esteira-labs:latest
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       PORT: "8000"
-    ports:
-      - "127.0.0.1:${APP_PORT:-8000}:8000"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      APP_SECRET_KEY: ${APP_SECRET_KEY}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
+    expose:
+      - "8000"
+    networks:
+      - ativaai
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
@@ -16,3 +24,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+networks:
+  ativaai:
+    external: true
+    name: ativaai
