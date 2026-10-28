@@ -2,6 +2,7 @@ services:
   esteira-web:
     build: .
     image: esteira-labs:latest
+    pull_policy: build
     restart: unless-stopped
     environment:
       DB_HOST: ${DB_HOST:?Defina DB_HOST nas variaveis da Stack}
