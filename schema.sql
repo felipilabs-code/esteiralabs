@@ -33,12 +33,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     area VARCHAR(40) NOT NULL,
     stage ENUM('DEV', 'HML', 'PROD') NOT NULL DEFAULT 'DEV',
     due_date DATE NULL,
+    completed_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY ix_tasks_project_id (project_id),
     KEY ix_tasks_stage_area (stage, area),
     KEY ix_tasks_updated_at (updated_at),
+    KEY ix_tasks_completed_at (completed_at),
     CONSTRAINT fk_tasks_project FOREIGN KEY (project_id)
         REFERENCES projects (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

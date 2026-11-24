@@ -332,6 +332,8 @@ def task_output(connection, row):
         "due": row["due_date"].isoformat() if row["due_date"] else "",
         "assignees": assignees,
         "topics": topics,
+        "completed": bool(row.get("completed_at")),
+        "completedAt": row["completed_at"].isoformat() if row.get("completed_at") else "",
     }
 
 
@@ -408,6 +410,21 @@ def tasks_api(connection, item_id):
             cursor.execute("SELECT * FROM tasks ORDER BY updated_at DESC, created_at DESC")
             rows = cursor.fetchall()
         return jsonify([task_output(connection, row) for row in rows])
+
+    if request.method == "POST" and item_id:
+        completed = read_json().get("completed")
+        if not isinstance(completed, bool):
+            raise ApiError("Informe se a tarefa está finalizada.")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE tasks SET completed_at=" + ("UTC_TIMESTAMP()" if completed else "NULL") + " WHERE id=%s",
+                (item_id,),
+            )
+            cursor.execute("SELECT * FROM tasks WHERE id=%s", (item_id,))
+            row = cursor.fetchone()
+            if not row:
+                raise ApiError("Tarefa não encontrada.", 404)
+        return jsonify(task_output(connection, row))
 
     if request.method == "POST":
         data = task_values(read_json())
